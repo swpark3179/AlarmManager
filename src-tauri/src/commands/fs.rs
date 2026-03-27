@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::fs;
 use serde_json::Value;
+use tauri::async_runtime::spawn_blocking;
 
 pub fn get_alarm_dir() -> PathBuf {
     let mut path = dirs::home_dir().expect("Failed to get home directory");
@@ -23,31 +24,37 @@ pub fn get_config_file() -> PathBuf {
 #[tauri::command]
 pub async fn init_fs() -> Result<(), String> {
     let alarm_dir = get_alarm_dir();
-    if !alarm_dir.exists() {
-        fs::create_dir_all(&alarm_dir).map_err(|e| e.to_string())?;
-    }
-
     let alarms_file = get_alarms_file();
-    if !alarms_file.exists() {
-        fs::write(&alarms_file, "[]").map_err(|e| e.to_string())?;
-    }
-
     let config_file = get_config_file();
-    if !config_file.exists() {
-        let default_config = format!(
-            "executable_path={}\\.alarm\\Trigger.exe\n",
-            dirs::home_dir().unwrap().display()
-        );
-        fs::write(&config_file, default_config).map_err(|e| e.to_string())?;
-    }
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
 
-    Ok(())
+    spawn_blocking(move || {
+        if !alarm_dir.exists() {
+            fs::create_dir_all(&alarm_dir).map_err(|e| e.to_string())?;
+        }
+
+        if !alarms_file.exists() {
+            fs::write(&alarms_file, "[]").map_err(|e| e.to_string())?;
+        }
+
+        if !config_file.exists() {
+            let default_config = format!(
+                "executable_path={}\\.alarm\\Trigger.exe\n",
+                home_dir.display()
+            );
+            fs::write(&config_file, default_config).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn read_alarms() -> Result<Value, String> {
     let alarms_file = get_alarms_file();
-    let data = fs::read_to_string(alarms_file).map_err(|e| e.to_string())?;
+    let data = spawn_blocking(move || {
+        fs::read_to_string(alarms_file).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())??;
+
     let json: Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(json)
 }
@@ -56,35 +63,41 @@ pub async fn read_alarms() -> Result<Value, String> {
 pub async fn write_alarms(alarms: Value) -> Result<(), String> {
     let alarms_file = get_alarms_file();
     let data = serde_json::to_string_pretty(&alarms).map_err(|e| e.to_string())?;
-    fs::write(alarms_file, data).map_err(|e| e.to_string())?;
-    Ok(())
+    spawn_blocking(move || {
+        fs::write(alarms_file, data).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn read_alarm_content(id: String) -> Result<String, String> {
     let mut path = get_alarm_dir();
     path.push(format!("{}.md", id));
-    if path.exists() {
-        fs::read_to_string(path).map_err(|e| e.to_string())
-    } else {
-        Ok("".to_string())
-    }
+    spawn_blocking(move || {
+        if path.exists() {
+            fs::read_to_string(path).map_err(|e| e.to_string())
+        } else {
+            Ok("".to_string())
+        }
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn write_alarm_content(id: String, content: String) -> Result<(), String> {
     let mut path = get_alarm_dir();
     path.push(format!("{}.md", id));
-    fs::write(path, content).map_err(|e| e.to_string())?;
-    Ok(())
+    spawn_blocking(move || {
+        fs::write(path, content).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn delete_alarm_content(id: String) -> Result<(), String> {
     let mut path = get_alarm_dir();
     path.push(format!("{}.md", id));
-    if path.exists() {
-        fs::remove_file(path).map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    spawn_blocking(move || {
+        if path.exists() {
+            fs::remove_file(path).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
