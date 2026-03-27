@@ -1,0 +1,35 @@
+{
+  "productName": "tauri-alarm",
+  "version": "0.1.0",
+  "identifier": "com.tauri.alarm",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Tauri Alarm",
+        "width": 600,
+        "height": 700,
+        "decorations": false,
+        "resizable": false,
+        "visible": false,
+        "center": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "fs": {
+      "scope": ["$HOME/.alarm/**"]
+    },
+    "shell": {
+      "open": true
+    }
+  }
+}

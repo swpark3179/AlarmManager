@@ -1,0 +1,214 @@
+use std::process::Command;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+use crate::models::{Alarm, RepeatType};
+use std::fs;
+use std::path::PathBuf;
+
+fn get_config_file() -> PathBuf {
+    let mut path = dirs::home_dir().expect("Failed to get home directory");
+    path.push(".alarm");
+    path.push("config.properties");
+    path
+}
+
+fn get_executable_path() -> String {
+    let config_file = get_config_file();
+    if let Ok(content) = fs::read_to_string(&config_file) {
+        for line in content.lines() {
+            if line.starts_with("executable_path=") {
+                return line.replace("executable_path=", "").trim().to_string();
+            }
+        }
+    }
+    format!("{}\\.alarm\\Trigger.exe", dirs::home_dir().unwrap().display())
+}
+
+#[tauri::command]
+pub async fn register_task(alarm: Alarm) -> Result<(), String> {
+    let task_name = format!("TauriAlarm_{}", alarm.id);
+    let exec_path = get_executable_path();
+    let working_dir = format!("{}\\.alarm", dirs::home_dir().unwrap().display());
+    
+    // First, unregister if it exists to overwrite cleanly
+    #[cfg(target_os = "windows")]
+    let mut cmd = Command::new("powershell");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = Command::new("sh");
+    
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    #[cfg(target_os = "windows")]
+    let _ = cmd.arg("-Command")
+        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -Confirm:$false -ErrorAction SilentlyContinue", task_name))
+        .output();
+
+    let action_ps = format!("$Action = New-ScheduledTaskAction -Execute '{}' -Argument '--alarm-id {}' -WorkingDirectory '{}'", exec_path, alarm.id, working_dir);
+    let settings_ps = "$Settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -WakeToRun -Hidden";
+
+    let mut triggers_ps = String::new();
+    
+    match alarm.repeat_type {
+        RepeatType::None => {
+            if alarm.triggers.is_empty() {
+                return Err("No triggers provided for one-time alarm".into());
+            }
+            triggers_ps.push_str("$Triggers = @(");
+            for (i, t) in alarm.triggers.iter().enumerate() {
+                let date = t.date.as_ref().unwrap();
+                let time = t.time.as_ref().unwrap();
+                let datetime = format!("{}T{}", date, time);
+                triggers_ps.push_str(&format!("(New-ScheduledTaskTrigger -Once -At '{}')", datetime));
+                if i < alarm.triggers.len() - 1 {
+                    triggers_ps.push_str(", ");
+                }
+            }
+            triggers_ps.push_str(")");
+        },
+        RepeatType::Daily => {
+            if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
+            let time = alarm.triggers[0].time.as_ref().unwrap();
+            triggers_ps = format!("$Triggers = @(New-ScheduledTaskTrigger -Daily -At '{}')", time);
+        },
+        RepeatType::Weekly => {
+            if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
+            let t = &alarm.triggers[0];
+            let time = t.time.as_ref().unwrap();
+            let days_str = t.days_of_week.as_ref().unwrap().join(", ");
+            triggers_ps = format!("$Triggers = @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek {} -At '{}')", days_str, time);
+        },
+        RepeatType::Monthly => {
+             // For Monthly, we need to handle Nth week of the month and specific day
+             if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
+             let t = &alarm.triggers[0];
+             let time = t.time.as_ref().unwrap();
+             let day_of_week = &t.days_of_week.as_ref().unwrap()[0]; // Assuming one day
+             let week_of_month = t.weeks_of_month.as_ref().unwrap(); // e.g., "First", "Last"
+             // PowerShell New-ScheduledTaskTrigger does not directly support DayOfWeek + WeekOfMonth easily with standard parameters in the basic cmdlet, 
+             // but we can use the COM object or specific XML formulation.
+             // To keep it simple and stable via PowerShell, we can construct the specific trigger string.
+             // Note: Standard New-ScheduledTaskTrigger doesn't easily support "First Monday of month".
+             // We'll construct a custom Trigger object in PowerShell.
+             
+             let custom_trigger = format!(r#"
+$Trigger = New-ScheduledTaskTrigger -At '{}' -Once
+$Trigger.Repetition = $null
+$Trigger = [Microsoft.Management.Infrastructure.CimInstance]::new("MSFT_TaskMonthlyDOWTrigger", "root/Microsoft/Windows/TaskScheduler")
+$Trigger.StartBoundary = (Get-Date "{}").ToString("s")
+$Trigger.DaysOfWeek = [uint16]([System.DayOfWeek]::{})
+# Logic for week of month (1=First, 2=Second, 3=Third, 4=Fourth, 5=Last)
+$weeks = @{{ "First"=1; "Second"=2; "Third"=3; "Fourth"=4; "Last"=5 }}
+$Trigger.WeeksOfMonth = $weeks['{}']
+$Triggers = @($Trigger)
+             "#, time, time, day_of_week, week_of_month);
+             triggers_ps = custom_trigger;
+        }
+    }
+
+    let register_cmd = format!("Register-ScheduledTask -TaskName '{}' -Action $Action -Trigger $Triggers -Settings $Settings -Description 'Tauri Alarm Task'", task_name);
+    
+    let full_script = format!("{}\n{}\n{}\n{}", action_ps, settings_ps, triggers_ps, register_cmd);
+
+    #[cfg(target_os = "windows")]
+    let mut cmd2 = Command::new("powershell");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd2 = Command::new("sh");
+
+    #[cfg(target_os = "windows")]
+    cmd2.creation_flags(0x08000000);
+
+    let output = cmd2
+        .arg("-Command")
+        .arg(&full_script)
+        .output()
+        .map_err(|e: std::io::Error| e.to_string())?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to register task: {}", err));
+    }
+    
+    if !alarm.enabled {
+        let _ = disable_task(alarm.id).await;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn unregister_task(id: String) -> Result<(), String> {
+    let task_name = format!("TauriAlarm_{}", id);
+    
+    #[cfg(target_os = "windows")]
+    let mut cmd = Command::new("powershell");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = Command::new("sh");
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+
+    let output = cmd
+        .arg("-Command")
+        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -Confirm:$false", task_name))
+        .output()
+        .map_err(|e: std::io::Error| e.to_string())?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to unregister task: {}", err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn enable_task(id: String) -> Result<(), String> {
+    let task_name = format!("TauriAlarm_{}", id);
+    #[cfg(target_os = "windows")]
+    let mut cmd = Command::new("powershell");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = Command::new("sh");
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+
+    let output = cmd
+        .arg("-Command")
+        .arg(format!("Enable-ScheduledTask -TaskName '{}'", task_name))
+        .output()
+        .map_err(|e: std::io::Error| e.to_string())?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to enable task: {}", err));
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn disable_task(id: String) -> Result<(), String> {
+    let task_name = format!("TauriAlarm_{}", id);
+    #[cfg(target_os = "windows")]
+    let mut cmd = Command::new("powershell");
+    #[cfg(not(target_os = "windows"))]
+    let mut cmd = Command::new("sh");
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000);
+
+    let output = cmd
+        .arg("-Command")
+        .arg(format!("Disable-ScheduledTask -TaskName '{}'", task_name))
+        .output()
+        .map_err(|e: std::io::Error| e.to_string())?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to disable task: {}", err));
+    }
+
+    Ok(())
+}
