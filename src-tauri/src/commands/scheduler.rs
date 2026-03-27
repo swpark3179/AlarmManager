@@ -42,7 +42,7 @@ pub async fn register_task(alarm: Alarm) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     let _ = cmd.arg("-Command")
-        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -Confirm:$false -ErrorAction SilentlyContinue", task_name))
+        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -TaskPath '\\AlarmManager\\' -Confirm:$false -ErrorAction SilentlyContinue", task_name))
         .output();
 
     let action_ps = format!("$Action = New-ScheduledTaskAction -Execute '{}' -Argument '--alarm-id {}' -WorkingDirectory '{}'", exec_path, alarm.id, working_dir);
@@ -107,7 +107,7 @@ $Triggers = @($Trigger)
         }
     }
 
-    let register_cmd = format!("Register-ScheduledTask -TaskName '{}' -Action $Action -Trigger $Triggers -Settings $Settings -Description 'Tauri Alarm Task'", task_name);
+    let register_cmd = format!("Register-ScheduledTask -TaskName '{}' -TaskPath '\\AlarmManager\\' -Action $Action -Trigger $Triggers -Settings $Settings -Description 'Tauri Alarm Task'", task_name);
     
     let full_script = format!("{}\n{}\n{}\n{}", action_ps, settings_ps, triggers_ps, register_cmd);
 
@@ -151,7 +151,7 @@ pub async fn unregister_task(id: String) -> Result<(), String> {
 
     let output = cmd
         .arg("-Command")
-        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -Confirm:$false", task_name))
+        .arg(format!("Unregister-ScheduledTask -TaskName '{}' -TaskPath '\\AlarmManager\\' -Confirm:$false", task_name))
         .output()
         .map_err(|e: std::io::Error| e.to_string())?;
 
@@ -176,7 +176,7 @@ pub async fn enable_task(id: String) -> Result<(), String> {
 
     let output = cmd
         .arg("-Command")
-        .arg(format!("Enable-ScheduledTask -TaskName '{}'", task_name))
+        .arg(format!("Enable-ScheduledTask -TaskName '{}' -TaskPath '\\AlarmManager\\'", task_name))
         .output()
         .map_err(|e: std::io::Error| e.to_string())?;
 
@@ -201,7 +201,7 @@ pub async fn disable_task(id: String) -> Result<(), String> {
 
     let output = cmd
         .arg("-Command")
-        .arg(format!("Disable-ScheduledTask -TaskName '{}'", task_name))
+        .arg(format!("Disable-ScheduledTask -TaskName '{}' -TaskPath '\\AlarmManager\\'", task_name))
         .output()
         .map_err(|e: std::io::Error| e.to_string())?;
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ThemeProvider, CssBaseline, Box } from "@mui/material";
+import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography } from "@mui/material";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import nordTheme from "./theme/nord";
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   } = useAlarms();
   const [currentView, setCurrentView] = useState<"list" | "edit">("list");
   const [editingAlarm, setEditingAlarm] = useState<Alarm | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -40,10 +41,11 @@ const App: React.FC = () => {
   };
 
   const handleSave = async (alarm: Alarm, content: string) => {
+    setIsSaving(true);
     try {
       // Register with Task Scheduler
       await invoke("register_task", { alarm });
-      
+
       // Save content to markdown
       await invoke("write_alarm_content", { id: alarm.id, content });
 
@@ -56,11 +58,13 @@ const App: React.FC = () => {
         newAlarms = [...alarms, alarm];
       }
       await saveAlarms(newAlarms);
-      
+
       setCurrentView("list");
     } catch (err) {
       console.error("Save error:", err);
       alert(`Failed to save: ${err}`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -92,6 +96,28 @@ const App: React.FC = () => {
             onSave={handleSave}
             onCancel={() => setCurrentView("list")}
           />
+        )}
+
+        {/* 저장 중 오버레이 */}
+        {isSaving && (
+          <Box
+            sx={{
+              position: "fixed",
+              inset: 0,
+              bgcolor: "rgba(46, 52, 64, 0.65)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+              zIndex: 9999,
+            }}
+          >
+            <CircularProgress size={48} sx={{ color: "#88C0D0" }} />
+            <Typography variant="h6" sx={{ color: "#ECEFF4", fontWeight: 500 }}>
+              저장 중...
+            </Typography>
+          </Box>
         )}
       </Box>
     </ThemeProvider>

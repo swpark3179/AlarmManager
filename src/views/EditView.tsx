@@ -238,7 +238,7 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
-      <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
+      <Box data-tauri-drag-region sx={{ p: 2, bgcolor: 'primary.main', color: 'white', cursor: 'move', userSelect: 'none' }}>
         <Typography variant="h6">{alarm ? '알람 편집' : '새 알람'}</Typography>
       </Box>
 
