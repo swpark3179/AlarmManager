@@ -123,7 +123,7 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
                 />
               </Grid>
               <Grid size={2}>
-                <IconButton onClick={() => handleRemoveTrigger(i)} disabled={triggers.length === 1} color="error">
+                <IconButton onClick={() => handleRemoveTrigger(i)} disabled={triggers.length === 1} color="error" aria-label="날짜/시간 삭제">
                   <Delete />
                 </IconButton>
               </Grid>
