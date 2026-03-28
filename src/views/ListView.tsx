@@ -64,11 +64,12 @@ const ListView: React.FC<ListViewProps> = ({
                       checked={alarm.enabled}
                       onChange={(e) => onToggle(alarm.id, e.target.checked)}
                       disabled={loading}
+                      inputProps={{ 'aria-label': '알람 활성화 상태 변경' }}
                     />
-                    <IconButton onClick={() => onEdit(alarm)} disabled={loading}>
+                    <IconButton onClick={() => onEdit(alarm)} disabled={loading} aria-label="알람 편집">
                       <Edit fontSize="small" />
                     </IconButton>
-                    <IconButton onClick={() => onDelete(alarm.id)} disabled={loading} color="error">
+                    <IconButton onClick={() => onDelete(alarm.id)} disabled={loading} color="error" aria-label="알람 삭제">
                       <Delete fontSize="small" />
                     </IconButton>
                   </Box>
@@ -79,6 +80,7 @@ const ListView: React.FC<ListViewProps> = ({
                     size="small"
                     disabled={index === 0 || loading}
                     onClick={() => onReorder(alarm.id, 'up')}
+                    aria-label="순서 위로 이동"
                   >
                     <ArrowUpward fontSize="inherit" />
                   </IconButton>
@@ -86,6 +88,7 @@ const ListView: React.FC<ListViewProps> = ({
                     size="small"
                     disabled={index === alarms.length - 1 || loading}
                     onClick={() => onReorder(alarm.id, 'down')}
+                    aria-label="순서 아래로 이동"
                   >
                     <ArrowDownward fontSize="inherit" />
                   </IconButton>
@@ -103,7 +106,7 @@ const ListView: React.FC<ListViewProps> = ({
 
       <Fab
         color="secondary"
-        aria-label="add"
+        aria-label="새 알람 추가"
         sx={{ position: 'absolute', bottom: 16, right: 16 }}
         onClick={() => onEdit()}
         disabled={loading}
