@@ -1,7 +1,14 @@
-use std::path::PathBuf;
-use std::fs;
 use serde_json::Value;
+use std::fs;
+use std::path::PathBuf;
 use tauri::async_runtime::spawn_blocking;
+
+fn validate_id(id: &str) -> Result<(), String> {
+    if id.contains('/') || id.contains('\\') || id.contains("..") {
+        return Err("Invalid ID: Path traversal detected".to_string());
+    }
+    Ok(())
+}
 
 pub fn get_alarm_dir() -> PathBuf {
     let mut path = dirs::home_dir().expect("Failed to get home directory");
@@ -45,15 +52,17 @@ pub async fn init_fs() -> Result<(), String> {
             fs::write(&config_file, default_config).map_err(|e| e.to_string())?;
         }
         Ok(())
-    }).await.map_err(|e| e.to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn read_alarms() -> Result<Value, String> {
     let alarms_file = get_alarms_file();
-    let data = spawn_blocking(move || {
-        fs::read_to_string(alarms_file).map_err(|e| e.to_string())
-    }).await.map_err(|e| e.to_string())??;
+    let data = spawn_blocking(move || fs::read_to_string(alarms_file).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())??;
 
     let json: Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
     Ok(json)
@@ -63,34 +72,36 @@ pub async fn read_alarms() -> Result<Value, String> {
 pub async fn write_alarms(alarms: Value) -> Result<(), String> {
     let alarms_file = get_alarms_file();
     let data = serde_json::to_string_pretty(&alarms).map_err(|e| e.to_string())?;
-    spawn_blocking(move || {
-        fs::write(alarms_file, data).map_err(|e| e.to_string())
-    }).await.map_err(|e| e.to_string())?
+    spawn_blocking(move || fs::write(alarms_file, data).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn sanitize_id(id: &str) -> String {
+    id.replace("..", "").replace("/", "").replace("\\", "")
 }
 
 #[tauri::command]
 pub async fn read_alarm_content(id: String) -> Result<String, String> {
-    if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err("Invalid alarm ID".to_string());
-    }
+    validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
+    path.push(format!("{}.md", sanitize_id(&id)));
     spawn_blocking(move || {
         if path.exists() {
             fs::read_to_string(path).map_err(|e| e.to_string())
         } else {
             Ok("".to_string())
         }
-    }).await.map_err(|e| e.to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn write_alarm_content(id: String, content: String) -> Result<(), String> {
-    if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err("Invalid alarm ID".to_string());
-    }
+    validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
+    path.push(format!("{}.md", sanitize_id(&id)));
     spawn_blocking(move || {
         fs::write(path, content).map_err(|e| e.to_string())
     }).await.map_err(|e| e.to_string())?
@@ -98,17 +109,17 @@ pub async fn write_alarm_content(id: String, content: String) -> Result<(), Stri
 
 #[tauri::command]
 pub async fn delete_alarm_content(id: String) -> Result<(), String> {
-    if id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err("Invalid alarm ID".to_string());
-    }
+    validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
+    path.push(format!("{}.md", sanitize_id(&id)));
     spawn_blocking(move || {
         if path.exists() {
             fs::remove_file(path).map_err(|e| e.to_string())?;
         }
         Ok(())
-    }).await.map_err(|e| e.to_string())?
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
@@ -154,5 +165,33 @@ mod tests {
             assert!(res_dots.is_err());
             assert_eq!(res_dots.unwrap_err(), "Invalid alarm ID");
         });
+    }
+  
+    #[test]
+    fn test_sanitize_id() {
+        assert_eq!(sanitize_id("normal-id"), "normal-id");
+        assert_eq!(sanitize_id("../traversal"), "traversal");
+        assert_eq!(sanitize_id("..\\traversal"), "traversal");
+        assert_eq!(sanitize_id("folder/../../file"), "folderfile");
+        assert_eq!(sanitize_id("C:\\Windows\\System32"), "C:WindowsSystem32");
+    }
+
+    #[test]
+    fn test_validate_id() {
+        // Valid IDs
+        assert!(validate_id("12345").is_ok());
+        assert!(validate_id("abcde-12345").is_ok());
+        assert!(validate_id("some_valid_id").is_ok());
+
+        // Invalid IDs with path traversal
+        assert!(validate_id("../12345").is_err());
+        assert!(validate_id("12345/..").is_err());
+        assert!(validate_id("12345\\..").is_err());
+        assert!(validate_id("dir/12345").is_err());
+        assert!(validate_id("dir\\12345").is_err());
+        assert!(validate_id("..\\12345").is_err());
+        assert!(validate_id("..").is_err());
+        assert!(validate_id("/12345").is_err());
+        assert!(validate_id("\\12345").is_err());
     }
 }
