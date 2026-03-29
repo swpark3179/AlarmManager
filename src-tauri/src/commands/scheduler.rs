@@ -57,8 +57,8 @@ pub async fn register_task(alarm: Alarm) -> Result<(), String> {
             }
             triggers_ps.push_str("$Triggers = @(");
             for (i, t) in alarm.triggers.iter().enumerate() {
-                let date = t.date.as_ref().unwrap();
-                let time = t.time.as_ref().unwrap();
+                let date = t.date.as_ref().ok_or("Missing date")?;
+                let time = t.time.as_ref().ok_or("Missing time")?;
                 let datetime = format!("{}T{}", date, time);
                 triggers_ps.push_str(&format!("(New-ScheduledTaskTrigger -Once -At '{}')", datetime));
                 if i < alarm.triggers.len() - 1 {
@@ -69,23 +69,26 @@ pub async fn register_task(alarm: Alarm) -> Result<(), String> {
         },
         RepeatType::Daily => {
             if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
-            let time = alarm.triggers[0].time.as_ref().unwrap();
+            let time = alarm.triggers[0].time.as_ref().ok_or("Missing time")?;
             triggers_ps = format!("$Triggers = @(New-ScheduledTaskTrigger -Daily -At '{}')", time);
         },
         RepeatType::Weekly => {
             if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
             let t = &alarm.triggers[0];
-            let time = t.time.as_ref().unwrap();
-            let days_str = t.days_of_week.as_ref().unwrap().join(", ");
+            let time = t.time.as_ref().ok_or("Missing time")?;
+            let days_of_week = t.days_of_week.as_ref().ok_or("Missing days of week")?;
+            if days_of_week.is_empty() { return Err("No days of week provided".into()); }
+            let days_str = days_of_week.join(", ");
             triggers_ps = format!("$Triggers = @(New-ScheduledTaskTrigger -Weekly -DaysOfWeek {} -At '{}')", days_str, time);
         },
         RepeatType::Monthly => {
              // For Monthly, we need to handle Nth week of the month and specific day
              if alarm.triggers.is_empty() { return Err("No triggers provided".into()); }
              let t = &alarm.triggers[0];
-             let time = t.time.as_ref().unwrap();
-             let day_of_week = &t.days_of_week.as_ref().unwrap()[0]; // Assuming one day
-             let week_of_month = t.weeks_of_month.as_ref().unwrap(); // e.g., "First", "Last"
+             let time = t.time.as_ref().ok_or("Missing time")?;
+             let days_of_week = t.days_of_week.as_ref().ok_or("Missing days of week")?;
+             let day_of_week = days_of_week.get(0).ok_or("Missing day of week")?; // Assuming one day
+             let week_of_month = t.weeks_of_month.as_ref().ok_or("Missing week of month")?; // e.g., "First", "Last"
              // PowerShell New-ScheduledTaskTrigger does not directly support DayOfWeek + WeekOfMonth easily with standard parameters in the basic cmdlet, 
              // but we can use the COM object or specific XML formulation.
              // To keep it simple and stable via PowerShell, we can construct the specific trigger string.
