@@ -148,6 +148,26 @@ mod tests {
     }
 
     #[test]
+    fn test_path_traversal() {
+        tauri::async_runtime::block_on(async {
+            let id_with_slash = "foo/bar".to_string();
+            let res_slash = write_alarm_content(id_with_slash, "data".to_string()).await;
+            assert!(res_slash.is_err());
+            assert_eq!(res_slash.unwrap_err(), "Invalid alarm ID");
+
+            let id_with_backslash = "foo\\bar".to_string();
+            let res_backslash = write_alarm_content(id_with_backslash, "data".to_string()).await;
+            assert!(res_backslash.is_err());
+            assert_eq!(res_backslash.unwrap_err(), "Invalid alarm ID");
+
+            let id_with_dots = "../foo".to_string();
+            let res_dots = write_alarm_content(id_with_dots, "data".to_string()).await;
+            assert!(res_dots.is_err());
+            assert_eq!(res_dots.unwrap_err(), "Invalid alarm ID");
+        });
+    }
+  
+    #[test]
     fn test_sanitize_id() {
         assert_eq!(sanitize_id("normal-id"), "normal-id");
         assert_eq!(sanitize_id("../traversal"), "traversal");
