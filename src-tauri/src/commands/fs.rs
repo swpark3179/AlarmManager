@@ -77,11 +77,15 @@ pub async fn write_alarms(alarms: Value) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+fn sanitize_id(id: &str) -> String {
+    id.replace("..", "").replace("/", "").replace("\\", "")
+}
+
 #[tauri::command]
 pub async fn read_alarm_content(id: String) -> Result<String, String> {
     validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
+    path.push(format!("{}.md", sanitize_id(&id)));
     spawn_blocking(move || {
         if path.exists() {
             fs::read_to_string(path).map_err(|e| e.to_string())
@@ -97,17 +101,17 @@ pub async fn read_alarm_content(id: String) -> Result<String, String> {
 pub async fn write_alarm_content(id: String, content: String) -> Result<(), String> {
     validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
-    spawn_blocking(move || fs::write(path, content).map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    path.push(format!("{}.md", sanitize_id(&id)));
+    spawn_blocking(move || {
+        fs::write(path, content).map_err(|e| e.to_string())
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn delete_alarm_content(id: String) -> Result<(), String> {
     validate_id(&id)?;
     let mut path = get_alarm_dir();
-    path.push(format!("{}.md", id));
+    path.push(format!("{}.md", sanitize_id(&id)));
     spawn_blocking(move || {
         if path.exists() {
             fs::remove_file(path).map_err(|e| e.to_string())?;
@@ -141,6 +145,15 @@ mod tests {
         let config_file = get_config_file();
         assert!(config_file.ends_with("config.properties"));
         assert!(config_file.parent().unwrap().ends_with(".alarm"));
+    }
+
+    #[test]
+    fn test_sanitize_id() {
+        assert_eq!(sanitize_id("normal-id"), "normal-id");
+        assert_eq!(sanitize_id("../traversal"), "traversal");
+        assert_eq!(sanitize_id("..\\traversal"), "traversal");
+        assert_eq!(sanitize_id("folder/../../file"), "folderfile");
+        assert_eq!(sanitize_id("C:\\Windows\\System32"), "C:WindowsSystem32");
     }
 
     #[test]
