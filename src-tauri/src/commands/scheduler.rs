@@ -13,23 +13,25 @@ fn get_config_file() -> PathBuf {
     path
 }
 
-fn get_executable_path() -> String {
+fn get_executable_path() -> Result<String, String> {
     let config_file = get_config_file();
     if let Ok(content) = fs::read_to_string(&config_file) {
         for line in content.lines() {
             if line.starts_with("executable_path=") {
-                return line.replace("executable_path=", "").trim().to_string();
+                return Ok(line.replace("executable_path=", "").trim().to_string());
             }
         }
     }
-    format!("{}\\.alarm\\Trigger.exe", dirs::home_dir().unwrap().display())
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    Ok(format!("{}\\.alarm\\Trigger.exe", home_dir.display()))
 }
 
 #[tauri::command]
 pub async fn register_task(alarm: Alarm) -> Result<(), String> {
     let task_name = format!("TauriAlarm_{}", alarm.id);
-    let exec_path = get_executable_path();
-    let working_dir = format!("{}\\.alarm", dirs::home_dir().unwrap().display());
+    let exec_path = get_executable_path()?;
+    let home_dir = dirs::home_dir().ok_or("Failed to get home directory")?;
+    let working_dir = format!("{}\\.alarm", home_dir.display());
     
     // First, unregister if it exists to overwrite cleanly
     #[cfg(target_os = "windows")]
