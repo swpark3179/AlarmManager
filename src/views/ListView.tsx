@@ -18,7 +18,8 @@ import {
   ArrowDownward,
   Edit,
   Delete,
-  Add
+  Add,
+  NotificationsNone
 } from '@mui/icons-material';
 import { Alarm } from '../types';
 import { formatSchedule } from '../utils/format';
@@ -130,9 +131,15 @@ const ListView: React.FC<ListViewProps> = ({
 
       <Box sx={{ flex: 1, overflowY: 'auto', p: 1, bgcolor: 'background.default' }}>
         {alarms.length === 0 && !loading && (
-          <Typography align="center" color="text.secondary" sx={{ mt: 4 }}>
-            등록된 알람이 없습니다.
-          </Typography>
+          <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.7 }}>
+            <NotificationsNone sx={{ fontSize: 64, mb: 2, color: 'text.secondary' }} />
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              등록된 알람이 없습니다
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              우측 하단의 + 버튼을 눌러 새 알람을 추가해보세요.
+            </Typography>
+          </Box>
         )}
 
         {renderAlarmList(oneTimeAlarms, '1회성 알림')}
