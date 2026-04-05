@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography } from "@mui/material";
+import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography, Button } from "@mui/material";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import nordTheme from "./theme/nord";
@@ -71,10 +71,20 @@ const App: React.FC = () => {
 
   if (error) {
     return (
-      <Box sx={{ p: 4, color: "red" }}>
-        <h2>Error</h2>
-        <p>{error}</p>
-      </Box>
+      <ThemeProvider theme={nordTheme}>
+        <CssBaseline />
+        <Box sx={{ p: 4, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", textAlign: "center" }} role="alert">
+          <Typography variant="h5" color="error" gutterBottom>
+            데이터를 불러오는 중 오류가 발생했습니다
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Button variant="outlined" onClick={() => window.location.reload()}>
+            다시 시도
+          </Button>
+        </Box>
+      </ThemeProvider>
     );
   }
 
@@ -113,9 +123,11 @@ const App: React.FC = () => {
               gap: 2,
               zIndex: 9999,
             }}
+            role="status"
+            aria-live="polite"
           >
-            <CircularProgress size={48} sx={{ color: "#88C0D0" }} />
-            <Typography variant="h6" sx={{ color: "#ECEFF4", fontWeight: 500 }}>
+            <CircularProgress size={48} sx={{ color: "#88C0D0" }} aria-label="저장 중" />
+            <Typography variant="h6" sx={{ color: "#ECEFF4", fontWeight: 500 }} aria-hidden="true">
               저장 중...
             </Typography>
           </Box>
