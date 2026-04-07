@@ -60,6 +60,8 @@ const ListView: React.FC<ListViewProps> = ({
     setDeleteConfirmId(null);
   };
 
+  const alarmToDelete = alarms.find(a => a.id === deleteConfirmId);
+
   const oneTimeAlarms = alarms.filter((a) => a.repeat_type === 'None');
   const periodicAlarms = alarms.filter((a) => a.repeat_type !== 'None');
 
@@ -83,18 +85,18 @@ const ListView: React.FC<ListViewProps> = ({
                       checked={alarm.enabled}
                       onChange={(e) => onToggle(alarm.id, e.target.checked)}
                       disabled={loading}
-                      inputProps={{ 'aria-label': '알람 활성화 상태 변경' }}
+                      inputProps={{ 'aria-label': `"${alarm.title}" 알람 활성화 상태 변경` }}
                     />
                     <Tooltip title="알람 편집">
                       <span>
-                        <IconButton onClick={() => onEdit(alarm)} disabled={loading} aria-label="알람 편집">
+                        <IconButton onClick={() => onEdit(alarm)} disabled={loading} aria-label={`"${alarm.title}" 알람 편집`}>
                           <Edit fontSize="small" />
                         </IconButton>
                       </span>
                     </Tooltip>
                     <Tooltip title="알람 삭제">
                       <span>
-                        <IconButton onClick={() => setDeleteConfirmId(alarm.id)} disabled={loading} color="error" aria-label="알람 삭제">
+                        <IconButton onClick={() => setDeleteConfirmId(alarm.id)} disabled={loading} color="error" aria-label={`"${alarm.title}" 알람 삭제`}>
                           <Delete fontSize="small" />
                         </IconButton>
                       </span>
@@ -109,7 +111,7 @@ const ListView: React.FC<ListViewProps> = ({
                         size="small"
                         disabled={index === 0 || loading}
                         onClick={() => onReorder(alarm.id, 'up')}
-                        aria-label="순서 위로 이동"
+                        aria-label={`"${alarm.title}" 순서 위로 이동`}
                       >
                         <ArrowUpward fontSize="inherit" />
                       </IconButton>
@@ -121,7 +123,7 @@ const ListView: React.FC<ListViewProps> = ({
                         size="small"
                         disabled={index === alarmList.length - 1 || loading}
                         onClick={() => onReorder(alarm.id, 'down')}
-                        aria-label="순서 아래로 이동"
+                        aria-label={`"${alarm.title}" 순서 아래로 이동`}
                       >
                         <ArrowDownward fontSize="inherit" />
                       </IconButton>
@@ -201,7 +203,7 @@ const ListView: React.FC<ListViewProps> = ({
         aria-describedby="delete-dialog-description"
       >
         <DialogTitle id="delete-dialog-title">
-          알람을 삭제하시겠습니까?
+          {alarmToDelete ? `"${alarmToDelete.title}" 알람을 삭제하시겠습니까?` : '알람을 삭제하시겠습니까?'}
         </DialogTitle>
         <DialogContent>
           <DialogContentText id="delete-dialog-description">
