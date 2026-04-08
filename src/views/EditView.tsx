@@ -169,8 +169,9 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
       return (
         <Box sx={{ mt: 2 }}>
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>요일</InputLabel>
+            <InputLabel id="weekly-days-label">요일</InputLabel>
             <Select
+              labelId="weekly-days-label"
               multiple
               value={triggers[0]?.days_of_week || []}
               onChange={(e) => handleTriggerChange(0, 'days_of_week', e.target.value)}
@@ -199,8 +200,9 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
           <Grid container spacing={2}>
             <Grid size={6}>
               <FormControl fullWidth>
-                <InputLabel>주차</InputLabel>
+                <InputLabel id="monthly-week-label">주차</InputLabel>
                 <Select
+                  labelId="monthly-week-label"
                   value={triggers[0]?.weeks_of_month || ''}
                   onChange={(e) => handleTriggerChange(0, 'weeks_of_month', e.target.value)}
                   label="주차"
@@ -213,8 +215,9 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
             </Grid>
             <Grid size={6}>
               <FormControl fullWidth>
-                <InputLabel>요일</InputLabel>
+                <InputLabel id="monthly-day-label">요일</InputLabel>
                 <Select
+                  labelId="monthly-day-label"
                   value={triggers[0]?.days_of_week?.[0] || ''}
                   onChange={(e) => handleTriggerChange(0, 'days_of_week', [e.target.value])}
                   label="요일"
@@ -279,8 +282,9 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
         />
 
         <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>반복 주기</InputLabel>
+          <InputLabel id="repeat-type-label">반복 주기</InputLabel>
           <Select
+            labelId="repeat-type-label"
             value={repeatType}
             onChange={(e) => {
               setRepeatType(e.target.value as RepeatType);
@@ -317,6 +321,7 @@ const EditView: React.FC<EditViewProps> = ({ alarm, onSave, onCancel }) => {
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="마크다운을 지원합니다..."
+              label="알람 내용 (마크다운 지원)"
             />
           </Box>
           <Box
