@@ -17,3 +17,7 @@
 ## 2025-05-19 - Top-level Exit Actions & Esc Shortcut for Forms
 **Learning:** Found that long forms (especially those with Markdown previews) can act as scrolling traps. If the only way to cancel/exit is at the bottom of the page, users feel trapped or get frustrated having to scroll all the way down.
 **Action:** Always provide a top-level exit action (like a back button or an `X` in the header) and support the `Escape` key to quickly cancel/close full-page forms or modals. Ensure these icon buttons have descriptive Korean `aria-label`s.
+
+## 2025-06-11 - MUI Select Label Association and Persistent Text Field Labels
+**Learning:** Found that Material-UI `<Select>` components were not correctly associated with their `<InputLabel>`s because they lacked `labelId` and `id` linkage. Screen readers need this explicit linkage to announce the select's purpose. Furthermore, using only `placeholder` on a multiline `<TextField>` provides poor UX and accessibility because the visual hint disappears when the user starts typing, and the field lacks an accessible name.
+**Action:** Always provide explicitly linked `id` on `<InputLabel>` and `labelId` on `<Select>` components. Always use a `label` prop on `<TextField>` (even if there is a placeholder) to maintain context during typing and ensure the field is accessible to assistive technologies.
